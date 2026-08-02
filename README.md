@@ -1,76 +1,120 @@
 # ⚡ Micro Energy Trader
 
-An autonomous AI-powered microgrid energy trading system built with a **Human-in-the-Loop (HITL)** architecture. The system monitors weather metrics, analyzes them using LLM-based agents, and proposes energy trading strategies (Buy, Sell, Hold). All high-risk decisions are paused for human approval via Telegram before execution.
+An autonomous, production-ready AI energy trading system for microgrids. The system fetches live weather metrics, processes them using a multi-agent **LangGraph** pipeline with **Human-in-the-Loop (HITL)** safety guardrails, stores time-series data in **TimescaleDB**, and presents real-time analytics on a **Streamlit** dashboard.
+
+---
 
 ## 🌟 Key Features
 
-* **Automated Data Ingestion:** Weather and grid metrics are continuously ingested via an automated **n8n** workflow.
-* **AI Agent Workflow (LangGraph):** A structured LLM pipeline that analyzes metrics, determines confidence levels, and outputs strictly typed trading strategies using Pydantic.
-* **Human-in-the-Loop (HITL):** Risk-policy routing automatically pauses executions if the AI's confidence is below a certain threshold, awaiting human approval via one-click Telegram notifications.
-* **Time-Series Database:** All metrics and executed trades are securely stored in **TimescaleDB** (PostgreSQL) for high-performance querying.
-* **Real-time Dashboard:** A responsive **Streamlit** interface to monitor weather trends and review the AI agent's historical decisions.
+* **Real-Time Data Ingestion:** Automatically ingests live, high-precision weather metrics (Temperature, Wind Speed, Cloud Cover, Relative Humidity) via the **Open-Meteo API** through an **n8n** automation pipeline.
+* **AI Trading Agent (LangGraph):** Uses LLM-powered nodes (`gpt-4o-mini`) with strictly typed Pydantic outputs to evaluate energy supply/demand and formulate market strategies (`buy`, `sell`, `hold`).
+* **Human-in-the-Loop (HITL):** Built-in risk management policy that interrupts execution for trades requiring manual validation, sending interactive single-click approval webhooks via **Telegram**.
+* **Time-Series Storage:** High-performance storage of metrics and trading execution history powered by **TimescaleDB** (PostgreSQL).
+* **Monitoring Dashboard:** Interactive **Streamlit** visualizer displaying live weather trends and historical AI trading actions.
+
+---
+
+## 🏗️ Architecture & Data Flow
+
+```text
+[ Open-Meteo API ]
+       │ (Real-time Weather Data)
+       ▼
+   [ n8n Workflow ] ──► [ JS Payload Formatter ]
+                               │
+                               ▼
+                        [ FastAPI App ]
+                               │
+            ┌──────────────────┴──────────────────┐
+            ▼                                     ▼
+     [ TimescaleDB ]                    [ LangGraph Agent ]
+  (Store Weather Metrics)                         │
+                                          (Risk Evaluation)
+                                                  │
+                                                  ▼
+                                       [ Telegram Approval ]
+                                                  │
+                                            (User Clicks)
+                                                  │
+                                                  ▼
+                                         [ Execute & Persist ]
+```
+
+---
 
 ## 🛠️ Tech Stack
 
 | Component | Technology |
-| :--- | :--- |
-| **Backend API** | FastAPI, Python 3.11 |
+| --- | --- |
+| **Data Provider** | Open-Meteo API (Live Meteorological Data) |
+| **Backend API** | FastAPI, Python 3.11, Pydantic |
 | **AI / Multi-Agent** | LangGraph, LangChain, OpenAI (`gpt-4o-mini`) |
 | **Database** | TimescaleDB (PostgreSQL), `asyncpg` |
-| **Frontend / UI** | Streamlit |
-| **Automation** | n8n (Workflow automation & Telegram Webhooks) |
-| **Infrastructure** | Docker, Docker Compose |
+| **Frontend / UI** | Streamlit, Plotly |
+| **Workflow Automation** | n8n (Webhooks, Scheduled Ingestion, Telegram Integration) |
+| **Containerization** | Docker, Docker Compose |
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- OpenAI API Key
-- *(Optional)* n8n instance and Telegram Bot Token for automated workflows.
+* **Docker Desktop** (with Docker Compose)
+* An **OpenAI API Key**
+* *(Optional)* An **n8n** instance & **Telegram Bot Token** for full workflow automation.
 
-### Installation
+### Quick Start
 
-1. Clone the repository:
+1. **Clone the repository:**
 
-```bash
-git clone https://github.com/aleksandrhajoyan/micro-energy-trader.git
-cd micro-energy-trader
-```
+   ```bash
+   git clone https://github.com/aleksandrhajoyan/micro-energy-trader.git
+   cd micro-energy-trader
+   ```
 
-2. Environment Setup
+2. **Configure environment variables:**
 
-Rename the provided `.env.example` file to `.env` and insert your OpenAI API key and database credentials.
+   Copy `.env.example` to `.env` and fill in your OpenAI API Key:
 
-```bash
-cp .env.example .env
-```
+   ```bash
+   cp .env.example .env
+   ```
 
-3. Run the services
+3. **Build and run containers:**
 
-Spin up the TimescaleDB, FastAPI backend, and Streamlit dashboard using Docker Compose.
+   Launch all microservices (TimescaleDB, FastAPI, Streamlit) in detached mode:
 
-```bash
-docker-compose up -d --build
-```
+   ```bash
+   docker-compose up -d --build
+   ```
 
-## 📊 Endpoints & Access
+---
 
-- **Dashboard (Streamlit):** `http://localhost:8505`
-- **API Documentation (Swagger UI):** `http://localhost:8000/docs`
-- **TimescaleDB:** `localhost:5432`
+## 📊 Services & Endpoints
 
-## 📂 Project Structure
+| Service | Access URL | Description |
+| --- | --- | --- |
+| **Streamlit Dashboard** | `http://localhost:8505` | Real-time graphs and AI decision log |
+| **FastAPI Swagger Docs** | `http://localhost:8000/docs` | Interactive API documentation |
+| **TimescaleDB** | `localhost:5432` | PostgreSQL time-series database |
+
+---
+
+## 📁 Project Structure
 
 ```text
 micro_energy_trader/
-├── api/
-│   ├── main.py
-│   ├── graph.py
-│   ├── database.py
-│   └── models.py
-├── dashboard/
-│   └── app.py
-├── .env.example
-└── docker-compose.yml
+├── api/                   # FastAPI Backend & AI Agents
+│   ├── main.py            # API routes and HITL endpoints
+│   ├── graph.py           # LangGraph state graph & trade execution node
+│   ├── database.py        # TimescaleDB connection pool & queries
+│   ├── models.py          # Pydantic schema validation
+│   └── Dockerfile
+├── dashboard/             # Streamlit Analytics UI
+│   ├── app.py             # Dashboard UI logic
+│   └── Dockerfile
+├── .env.example           # Template for environment variables
+├── .gitignore             # Ignored tracking files (credentials, data)
+└── docker-compose.yml     # Multi-container orchestrator
 ```
