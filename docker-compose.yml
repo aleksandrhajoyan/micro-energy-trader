@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # TimescaleDB (PostgreSQL with time-series capabilities)
+  timescaledb:
+    image: timescale/timescaledb-ha:pg15
+    container_name: timescaledb
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-energy_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    networks:
+      - met_network
+    restart: unless-stopped
+
+  # n8n Workflow Automation
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n_app
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - met_network
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+
+  # FastAPI Backend Services
+  fastapi_app:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    ports:
+      - "8003:8000"
+    environment:
+      # Connection string for asyncpg
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-password}@timescaledb:5432/${DB_NAME:-energy_db}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}
+    volumes:
+      - ./api:/app
+    # Run with hot-reload for development
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - met_network
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+
+  # Streamlit Dashboard (NEW)
+  dashboard:
+    build:
+      context: ./dashboard
+    container_name: streamlit_dashboard
+    ports:
+      - "8505:8501"
+    environment:
+      # Connection string for SQLAlchemy (psycopg2) used by pandas/streamlit
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@timescaledb:5432/${DB_NAME:-energy_db}
+    networks:
+      - met_network
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  timescaledb_data:
+  n8n_data:
+
+# Internal Docker network
+networks:
+  met_network:
+    driver: bridge
