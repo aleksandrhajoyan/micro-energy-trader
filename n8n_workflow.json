@@ -1,0 +1,243 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -384,
+        80
+      ],
+      "id": "cb982ca6-98aa-4bee-9714-8047fa895452",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi_app:8000/api/v1/weather/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        336,
+        144
+      ],
+      "id": "f0b8d6d1-6d35-4ffc-9f77-91a0a0d82366",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "chatId": "996187763",
+        "text": "=Действие: {{ $json.strategy_proposed.action }}\n\nУверенность: {{ $json.strategy_proposed.confidence }}%\n\nЛогика: {{ $json.strategy_proposed.reasoning }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Одобрить сделку",
+                    "additionalFields": {
+                      "url": "=http://lvh.me:8003/api/v1/agent/approve-get/{{ $json.thread_id }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        -80
+      ],
+      "id": "caea3903-120e-45de-8dc4-a64ae716ee8f",
+      "name": "Send a text message",
+      "webhookId": "8b446de1-d156-4016-afa5-d9efb812a2a5",
+      "credentials": {
+        "telegramApi": {
+          "id": "oVt3nfsIgdtYHs3d",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=40.18&longitude=44.51&current=temperature_2m,relative_humidity_2m,wind_speed_10m,cloud_cover&wind_speed_unit=ms",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -176,
+        80
+      ],
+      "id": "f7af90a2-4b22-4062-8160-e0b3d9672404",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $json.current;\n\nreturn {\n  temperature: current.temperature_2m,\n  humidity: current.relative_humidity_2m,\n  wind_speed: current.wind_speed_10m,\n  cloud_cover: current.cloud_cover,\n  timestamp: current.time\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        80
+      ],
+      "id": "4b5258c8-ddce-4576-b6d5-095be0935e14",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "118dcfdb-835f-477b-b79f-6f6272b942d9",
+              "leftValue": "={{ $json.strategy_proposed.confidence }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "05278338-85ec-4df2-baeb-6eb11569cc3c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "996187763",
+        "text": "=⚡ Сделка исполнена автоматически! \n\nДействие: {{ $json.strategy_proposed.action }}\n\nУверенность: {{ $json.strategy_proposed.confidence }}% \n\nЛогика: {{ $json.strategy_proposed.reasoning }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        800,
+        240
+      ],
+      "id": "ad72943e-5c48-4bbb-a4df-491e767c1d04",
+      "name": "Send a text message1",
+      "webhookId": "677904e7-4006-4508-895b-08df32433e25",
+      "credentials": {
+        "telegramApi": {
+          "id": "oVt3nfsIgdtYHs3d",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "caadf01b-0b7e-4ede-8a43-d564a38043d3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c8c5bf04cc2b2cf36bab3cd3246bb3a5f241ef216cf10154a04bdce99349abbb"
+  },
+  "nodeGroups": [],
+  "id": "jR8MzTS9yEEeHvvY",
+  "tags": []
+}
